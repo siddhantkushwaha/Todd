@@ -18,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder
 import java.io.*
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.concurrent.Executors
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -45,7 +46,7 @@ class GDrive {
     private fun getCredentials(HTTP_TRANSPORT: NetHttpTransport): Credential {
         // Load client secrets.
 
-        val inputStream = FileInputStream("config_drive.json")
+        val inputStream = FileInputStream(CREDENTIALS_FILE_PATH)
         val clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, InputStreamReader(inputStream))
 
         // Build flow and trigger user authorization request.
@@ -90,23 +91,18 @@ class GDrive {
             null
     }
 
-    public fun downloadWithoutResume(link: String, downloadDir: String) {
+
+    public fun downloadLocally(link: String, downloadDir: String, numWorkers: Int = 8) {
         val fileId = getIdFromLink(link)!!
         val file = service.files().get(fileId).setFields("name, size").execute()!!
 
-        Files.createDirectories(Paths.get(downloadDir))
-        download(fileId, Paths.get(downloadDir, file.name).toString())
-    }
-
-    public fun downloadWithResume(link: String, downloadDir: String) {
-        val fileId = getIdFromLink(link)!!
-        val file = service.files().get(fileId).setFields("name, size").execute()!!
-
-        /* chunk size of 10 MB */
-        val chunkSizeConst: Long = 10 * 2.0.pow(20).toLong()
+        /* chunk size of 25 MB */
+        val chunkSizeConst: Long = 25 * 2.0.pow(20).toLong()
         val chunkDir = Paths.get(downloadDir, fileId).toString()
         Files.createDirectories(Paths.get(chunkDir))
 
+
+        val executor = Executors.newFixedThreadPool(numWorkers)
         val chunks = ArrayList<String>()
 
         var firstBytePos: Long = 0
@@ -127,13 +123,16 @@ class GDrive {
             val expectedChunkSize: Long = (lastBytePos - firstBytePos) + 1
 
             if (chunkSize != expectedChunkSize)
-                download(fileId, chunkPath, firstBytePos, lastBytePos)
+                executor.execute {
+                    download(fileId, chunkPath, firstBytePos, lastBytePos)
+                    println("Downloaded $chunkName for file ${file.name}.")
+                }
 
             firstBytePos += expectedChunkSize
             chunks.add(chunkPath)
-
-            println("Downloaded: ${(firstBytePos.toDouble() / file.getSize()) * 100}%")
         }
+
+        executor.shutdown()
 
         val filePath = Paths.get(downloadDir, file.name).toString()
         val fileStream = FileOutputStream(filePath)
