@@ -31,7 +31,7 @@ build/
 
 ### Other ###
 application.properties
-config_drive.json
+credentials.json
 **.DS_Store
 **Downloads
 **tokens

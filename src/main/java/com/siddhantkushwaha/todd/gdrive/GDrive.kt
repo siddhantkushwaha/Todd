@@ -14,7 +14,6 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import org.springframework.util.FileSystemUtils
 import org.springframework.web.util.UriComponentsBuilder
-
 import java.io.*
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -28,7 +27,7 @@ class GDrive {
     private val APPLICATION_NAME = "GDrive - Todd"
     private val SCOPES = listOf(DriveScopes.DRIVE)
     private val JSON_FACTORY: JsonFactory = JacksonFactory.getDefaultInstance()
-    private val CREDENTIALS_FILE_PATH = "config_drive.json"
+    private val CREDENTIALS_FILE_PATH = "/credentials.json"
     private val TOKENS_DIRECTORY_PATH = "tokens"
 
     /* 32 MB */
@@ -46,7 +45,9 @@ class GDrive {
     private fun getCredentials(HTTP_TRANSPORT: NetHttpTransport): Credential {
         // Load client secrets.
 
-        val inputStream = FileInputStream(CREDENTIALS_FILE_PATH)
+        val inputStream = GDrive::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH)
+                ?: throw FileNotFoundException("Resource not found: $CREDENTIALS_FILE_PATH")
+
         val clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, InputStreamReader(inputStream))
 
         // Build flow and trigger user authorization request.
@@ -100,7 +101,6 @@ class GDrive {
         val chunkSizeConst: Long = 25 * 2.0.pow(20).toLong()
         val chunkDir = Paths.get(downloadDir, fileId).toString()
         Files.createDirectories(Paths.get(chunkDir))
-
 
         val executor = Executors.newFixedThreadPool(numWorkers)
         val chunks = ArrayList<String>()
