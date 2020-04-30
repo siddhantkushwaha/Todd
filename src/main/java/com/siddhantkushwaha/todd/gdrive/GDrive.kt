@@ -133,6 +133,7 @@ class GDrive {
         // actual downloading starts here for remaning chunks
         val executor = Executors.newFixedThreadPool(numWorkers)
         executor.invokeAll(tasks)
+        executor.shutdown()
 
         val filePath = Paths.get(downloadDir, file.name).toString()
         val fileStream = FileOutputStream(filePath)
