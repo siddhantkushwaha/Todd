@@ -92,19 +92,20 @@ class GDrive {
             null
     }
 
-
     public fun downloadLocally(link: String, downloadDir: String, numWorkers: Int = 8) {
         val fileId = getIdFromLink(link)!!
         val file = service.files().get(fileId).setFields("name, size").execute()!!
 
         /* chunk size of 25 MB */
         val chunkSizeConst: Long = 25 * 2.0.pow(20).toLong()
+
         val chunkDir = Paths.get(downloadDir, fileId).toString()
         Files.createDirectories(Paths.get(chunkDir))
 
-        val executor = Executors.newFixedThreadPool(numWorkers)
+        val tasks = ArrayList<DownloadTask>()
         val chunks = ArrayList<String>()
 
+        // loop on required chunks and create download tasks
         var firstBytePos: Long = 0
         while (firstBytePos < file.getSize()) {
 
@@ -123,16 +124,15 @@ class GDrive {
             val expectedChunkSize: Long = (lastBytePos - firstBytePos) + 1
 
             if (chunkSize != expectedChunkSize)
-                executor.execute {
-                    download(fileId, chunkPath, firstBytePos, lastBytePos)
-                    println("Downloaded $chunkName for file ${file.name}.")
-                }
+                tasks.add(DownloadTask(this, fileId, chunkPath, firstBytePos, lastBytePos))
 
             firstBytePos += expectedChunkSize
             chunks.add(chunkPath)
         }
 
-        executor.shutdown()
+        // actual downloading starts here for remaning chunks
+        val executor = Executors.newFixedThreadPool(numWorkers)
+        executor.invokeAll(tasks)
 
         val filePath = Paths.get(downloadDir, file.name).toString()
         val fileStream = FileOutputStream(filePath)
