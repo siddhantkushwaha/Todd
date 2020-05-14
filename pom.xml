@@ -2,6 +2,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <groupId>com.siddhantkushwaha</groupId>
+    <artifactId>todd</artifactId>
+    <version>1.0</version>
+    <name>todd</name>
+    <packaging>jar</packaging>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -9,11 +14,6 @@
         <version>2.2.6.RELEASE</version>
         <relativePath/>
     </parent>
-
-    <groupId>com.siddhantkushwaha</groupId>
-    <artifactId>todd</artifactId>
-    <version>1.0</version>
-    <name>todd</name>
 
     <properties>
         <java.version>11</java.version>
