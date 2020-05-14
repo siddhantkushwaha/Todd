@@ -2,7 +2,6 @@ package com.siddhantkushwaha.todd.gdrive
 
 
 fun main(args: Array<String>) {
-
     if (args.isEmpty())
         throw Exception("Command not found.")
 

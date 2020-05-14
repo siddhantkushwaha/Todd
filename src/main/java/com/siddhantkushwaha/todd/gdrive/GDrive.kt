@@ -13,6 +13,7 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
+import com.siddhantkushwaha.todd.util.pack
 import org.springframework.util.FileSystemUtils
 import org.springframework.web.util.UriComponentsBuilder
 import java.io.*
@@ -93,11 +94,12 @@ class GDrive {
     }
 
     public fun upload(filePath: String, fileType: String = "", parentId: String? = null) {
-        val uploadFile = File(filePath)
+        var uploadFile = File(filePath)
         if (uploadFile.exists()) {
             if (uploadFile.isDirectory) {
-                println("Uploading directories not supported at the moment.")
-                return
+                println("Is a directory, zipping..")
+                val zippedFilePath = pack(filePath)
+                uploadFile = File(zippedFilePath)
             }
         } else {
             println("File/Directory not found: $filePath")
@@ -105,7 +107,6 @@ class GDrive {
         }
 
         val mediaContent = FileContent(fileType, uploadFile)
-
         val fileMetadata = com.google.api.services.drive.model.File()
         fileMetadata.name = uploadFile.name
 
