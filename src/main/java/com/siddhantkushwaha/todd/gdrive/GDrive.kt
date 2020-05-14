@@ -6,6 +6,7 @@ import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
+import com.google.api.client.http.FileContent
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.JsonFactory
 import com.google.api.client.json.jackson2.JacksonFactory
@@ -72,9 +73,8 @@ class GDrive {
             lastBytePos: Long? = null
     ): ByteArray? {
         val request = service.files().get(fileId)
-        request.mediaHttpDownloader
-                .setDirectDownloadEnabled(true)
-                .setChunkSize(CHUNK_SIZE.toInt())
+        request.mediaHttpDownloader.isDirectDownloadEnabled = false
+        request.mediaHttpDownloader.chunkSize = CHUNK_SIZE.toInt()
 
         if (firstBytePos != null && lastBytePos != null)
             request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
@@ -90,6 +90,37 @@ class GDrive {
             (outputStream as ByteArrayOutputStream).toByteArray()
         } else
             null
+    }
+
+    public fun upload(filePath: String, fileType: String = "", parentId: String? = null) {
+        val uploadFile = File(filePath)
+        if (uploadFile.exists()) {
+            if (uploadFile.isDirectory) {
+                println("Uploading directories not supported at the moment.")
+                return
+            }
+        } else {
+            println("File/Directory not found: $filePath")
+            return
+        }
+
+        val mediaContent = FileContent(fileType, uploadFile)
+
+        val fileMetadata = com.google.api.services.drive.model.File()
+        fileMetadata.name = uploadFile.name
+
+        if (!parentId.isNullOrBlank()) {
+            val parents = mutableListOf<String>()
+            parents.add(parentId)
+            fileMetadata.parents = parents
+        }
+
+        val request = service.files().create(fileMetadata, mediaContent)
+        request.mediaHttpUploader.isDirectUploadEnabled = false
+        request.mediaHttpUploader.setProgressListener {
+            println("Upload progress for ${uploadFile.name} - ${it.progress * 100}%")
+        }
+        request.execute()
     }
 
     public fun downloadLocally(link: String, downloadDir: String, numWorkers: Int = 8) {
