@@ -1,38 +1,11 @@
-target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**
-!**/src/test/**
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
+.gradle
 .idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-
-### VS Code ###
-.vscode/
-
-### Other ###
+/build/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
 application.properties
 credentials.json
 **.DS_Store
 **Downloads
 **tokens
-**META-INF

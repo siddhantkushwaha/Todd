@@ -14,9 +14,8 @@ import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.siddhantkushwaha.todd.util.pack
-import org.springframework.util.FileSystemUtils
-import org.springframework.web.util.UriComponentsBuilder
 import java.io.*
+import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.concurrent.Executors
@@ -40,38 +39,34 @@ class GDrive {
     init {
         val HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport()
         service = Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-                .setApplicationName(APPLICATION_NAME)
-                .build()
+            .setApplicationName(APPLICATION_NAME)
+            .build()
     }
 
     private fun getCredentials(HTTP_TRANSPORT: NetHttpTransport): Credential {
         // Load client secrets.
 
         val inputStream = GDrive::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH)
-                ?: throw FileNotFoundException("Resource not found: $CREDENTIALS_FILE_PATH")
+            ?: throw FileNotFoundException("Resource not found: $CREDENTIALS_FILE_PATH")
 
         val clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, InputStreamReader(inputStream))
 
         // Build flow and trigger user authorization request.
         val flow = GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-                .setDataStoreFactory(FileDataStoreFactory(File(TOKENS_DIRECTORY_PATH)))
-                .setAccessType("offline")
-                .build()
+            HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES
+        )
+            .setDataStoreFactory(FileDataStoreFactory(File(TOKENS_DIRECTORY_PATH)))
+            .setAccessType("offline")
+            .build()
         val receiver = LocalServerReceiver.Builder().setPort(8888).build()
         return AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
     }
 
-    public fun getIdFromLink(link: String): String? {
-        val queryParams = UriComponentsBuilder.fromUriString(link).build().queryParams
-        return queryParams["id"]?.get(0)
-    }
-
     public fun download(
-            fileId: String,
-            filePath: String? = null,
-            firstBytePos: Long? = null,
-            lastBytePos: Long? = null
+        fileId: String,
+        filePath: String? = null,
+        firstBytePos: Long? = null,
+        lastBytePos: Long? = null
     ): ByteArray? {
         val request = service.files().get(fileId)
         request.mediaHttpDownloader.isDirectDownloadEnabled = false
@@ -124,8 +119,7 @@ class GDrive {
         request.execute()
     }
 
-    public fun downloadLocally(link: String, downloadDir: String, numWorkers: Int = 8) {
-        val fileId = getIdFromLink(link)!!
+    public fun downloadLocally(fileId: String, downloadDir: String, numWorkers: Int = 8) {
         val file = service.files().get(fileId).setFields("name, size").execute()!!
 
         /* chunk size of 25 MB */
@@ -176,7 +170,7 @@ class GDrive {
 
         if (File(filePath).length() == file.getSize()) {
             println("File downloaded, deleting chunks..")
-            FileSystemUtils.deleteRecursively(File(chunkDir))
+            File(chunkDir).deleteRecursively()
         }
 
         println("Completed.")

@@ -10,7 +10,7 @@ fun main(args: Array<String>) {
         "download" -> {
             if (args.size < 3)
                 throw Exception("Less arguments than expected.")
-            gDrive.downloadLocally(link = args[1], downloadDir = args[2], numWorkers = 8)
+            gDrive.downloadLocally(fileId = args[1], downloadDir = args[2], numWorkers = 8)
         }
 
         "upload" -> {
