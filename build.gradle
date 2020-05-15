@@ -6,6 +6,15 @@ plugins {
 group 'com.siddhantkushwaha'
 version '1.0'
 
+task fatJar(type: Jar) {
+    from { configurations.runTimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest {
+        attributes 'Implementation-Title': 'Jar Build',
+                'Main-Class': 'com.siddhantkushwaha.todd.gdrive.GDriveApp'
+    }
+    with jar
+}
+
 repositories {
     mavenCentral()
 }
