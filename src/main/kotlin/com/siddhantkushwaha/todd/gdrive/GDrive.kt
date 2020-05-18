@@ -13,12 +13,14 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
-import com.siddhantkushwaha.todd.util.pack
 import java.io.*
-import java.net.URL
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.*
 import java.util.concurrent.Executors
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -88,37 +90,6 @@ class GDrive {
             null
     }
 
-    public fun upload(filePath: String, fileType: String = "", parentId: String? = null) {
-        var uploadFile = File(filePath)
-        if (uploadFile.exists()) {
-            if (uploadFile.isDirectory) {
-                println("Is a directory, zipping..")
-                val zippedFilePath = pack(filePath)
-                uploadFile = File(zippedFilePath)
-            }
-        } else {
-            println("File/Directory not found: $filePath")
-            return
-        }
-
-        val mediaContent = FileContent(fileType, uploadFile)
-        val fileMetadata = com.google.api.services.drive.model.File()
-        fileMetadata.name = uploadFile.name
-
-        if (!parentId.isNullOrBlank()) {
-            val parents = mutableListOf<String>()
-            parents.add(parentId)
-            fileMetadata.parents = parents
-        }
-
-        val request = service.files().create(fileMetadata, mediaContent)
-        request.mediaHttpUploader.isDirectUploadEnabled = false
-        request.mediaHttpUploader.setProgressListener {
-            println("Upload progress for ${uploadFile.name} - ${it.progress * 100}%")
-        }
-        request.execute()
-    }
-
     public fun downloadLocally(fileId: String, downloadDir: String, numWorkers: Int = 8) {
         val file = service.files().get(fileId).setFields("name, size").execute()!!
 
@@ -174,6 +145,83 @@ class GDrive {
         }
 
         println("Completed.")
+    }
+
+    private fun createDirectory(name: String, driveFolderParentId: String? = null): String {
+        val fileMetadata = com.google.api.services.drive.model.File()
+        fileMetadata.name = name
+        if (driveFolderParentId != null)
+            fileMetadata.parents = mutableListOf(driveFolderParentId)
+        fileMetadata.mimeType = "application/vnd.google-apps.folder"
+        val file = service.files().create(fileMetadata).setFields("id").execute()
+        return file.id
+    }
+
+    private fun uploadDirectory(directoryPath: Path, driveFolderParentId: String? = null) {
+
+        val cache = HashMap<String, String>()
+        Files.walk(directoryPath).filter { it.toFile().isFile }.forEach { filePath: Path ->
+
+            val relativeFilePath = directoryPath.parent.relativize(filePath)
+            val parentPaths: Stack<Path> = Stack()
+            var parentPath = relativeFilePath.parent
+            while (parentPath != null) {
+                parentPaths.add(parentPath)
+                parentPath = parentPath.parent
+            }
+
+            var tempDriveFolderParentId = driveFolderParentId
+            while (!parentPaths.empty()) {
+                parentPath = parentPaths.peek()
+
+                val name = parentPath.fileName.toString()
+                val key = "$name-$tempDriveFolderParentId"
+
+                if (cache.containsKey(key))
+                    tempDriveFolderParentId = cache[key]
+                else {
+                    println("Creating directory: $parentPath")
+                    tempDriveFolderParentId = createDirectory(name, tempDriveFolderParentId)
+                    cache[key] = tempDriveFolderParentId
+                }
+                parentPaths.pop()
+            }
+
+            println("Uploading file: $filePath")
+            uploadFile(filePath = filePath, driveFolderParentId = tempDriveFolderParentId)
+        }
+    }
+
+    private fun uploadFile(filePath: Path, fileType: String = "", driveFolderParentId: String? = null) {
+        val uploadFile = filePath.toFile()
+
+        val mediaContent = FileContent(fileType, uploadFile)
+        val fileMetadata = com.google.api.services.drive.model.File()
+        fileMetadata.name = uploadFile.name
+
+        if (!driveFolderParentId.isNullOrBlank()) {
+            val parents = mutableListOf<String>()
+            parents.add(driveFolderParentId)
+            fileMetadata.parents = parents
+        }
+
+        val request = service.files().create(fileMetadata, mediaContent)
+        request.mediaHttpUploader.isDirectUploadEnabled = false
+        request.mediaHttpUploader.setProgressListener {
+            println("Upload progress for ${uploadFile.name} - ${it.progress * 100}%")
+        }
+        request.execute()
+    }
+
+    public fun upload(path: Path, driveFolderParentId: String? = null) {
+        val file = path.toFile()
+        if (!file.exists())
+            println("Path doesn't exist, aborting.")
+
+        if (file.isDirectory)
+            uploadDirectory(directoryPath = path.toRealPath(), driveFolderParentId = driveFolderParentId)
+        else if (file.isFile)
+            uploadFile(filePath = path.toRealPath(), driveFolderParentId = driveFolderParentId)
     }
 }
 
