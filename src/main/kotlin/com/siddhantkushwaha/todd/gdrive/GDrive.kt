@@ -64,6 +64,16 @@ class GDrive {
         return AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
     }
 
+    public fun getSize(fileId: String): Long {
+        val file = service.files().get(fileId).setFields("size").execute()!!
+        return file.getSize()
+    }
+
+    public fun getName(fileId: String): String {
+        val file = service.files().get(fileId).setFields("name").execute()!!
+        return file.name
+    }
+
     public fun download(
         fileId: String,
         filePath: String? = null,
@@ -91,7 +101,8 @@ class GDrive {
     }
 
     public fun downloadLocally(fileId: String, downloadDir: String, numWorkers: Int = 8) {
-        val file = service.files().get(fileId).setFields("name, size").execute()!!
+        val fileSize = getSize(fileId)
+        val fileName = getName(fileId)
 
         /* chunk size of 25 MB */
         val chunkSizeConst: Long = 25 * 2.0.pow(20).toLong()
@@ -104,9 +115,9 @@ class GDrive {
 
         // loop on required chunks and create download tasks
         var firstBytePos: Long = 0
-        while (firstBytePos < file.getSize()) {
+        while (firstBytePos < fileSize) {
 
-            val lastBytePos: Long = min(firstBytePos + chunkSizeConst - 1, file.getSize() - 1)
+            val lastBytePos: Long = min(firstBytePos + chunkSizeConst - 1, fileSize - 1)
 
             val chunkName = "chunk-$firstBytePos-$lastBytePos"
             val chunkPath = Paths.get(chunkDir, chunkName).toString()
@@ -132,14 +143,14 @@ class GDrive {
         executor.invokeAll(tasks)
         executor.shutdown()
 
-        val filePath = Paths.get(downloadDir, file.name).toString()
+        val filePath = Paths.get(downloadDir, fileName).toString()
         val fileStream = FileOutputStream(filePath)
         chunks.forEach { chunkPath ->
             val inputStream = FileInputStream(chunkPath)
             fileStream.write(inputStream.readAllBytes())
         }
 
-        if (File(filePath).length() == file.getSize()) {
+        if (File(filePath).length() == fileSize) {
             println("File downloaded, deleting chunks..")
             File(chunkDir).deleteRecursively()
         }
