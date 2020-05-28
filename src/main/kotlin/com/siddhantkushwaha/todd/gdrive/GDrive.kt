@@ -147,6 +147,21 @@ class GDrive {
         println("Completed.")
     }
 
+    public fun downloadAsInputStream(
+        fileId: String,
+        firstBytePos: Long? = null,
+        lastBytePos: Long? = null
+    ): InputStream {
+        val request = service.files().get(fileId)
+        request.mediaHttpDownloader.isDirectDownloadEnabled = false
+        request.mediaHttpDownloader.chunkSize = CHUNK_SIZE.toInt()
+
+        if (firstBytePos != null && lastBytePos != null)
+            request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
+
+        return request.executeMediaAsInputStream()
+    }
+
     private fun createDirectory(name: String, driveFolderParentId: String? = null): String {
         val fileMetadata = com.google.api.services.drive.model.File()
         fileMetadata.name = name
