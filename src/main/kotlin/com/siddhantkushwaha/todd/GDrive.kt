@@ -1,4 +1,4 @@
-package com.siddhantkushwaha.todd.gdrive
+package com.siddhantkushwaha.todd
 
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp
@@ -132,7 +132,15 @@ class GDrive {
             val expectedChunkSize: Long = (lastBytePos - firstBytePos) + 1
 
             if (chunkSize != expectedChunkSize)
-                tasks.add(DownloadTask(this, fileId, chunkPath, firstBytePos, lastBytePos))
+                tasks.add(
+                    DownloadTask(
+                        this,
+                        fileId,
+                        chunkPath,
+                        firstBytePos,
+                        lastBytePos
+                    )
+                )
 
             firstBytePos += expectedChunkSize
             chunks.add(chunkPath)
