@@ -52,7 +52,7 @@ Update your build.gradle file.
 
 	        System.out.printf("********************* Range: bytes=%s-%s *********************", start, end);
 
-	        InputStream inputStream = gDrive.downloadAsInputStream(fileId, start, end), Key.Companion.getDataKey();
+	        InputStream inputStream = gDrive.downloadAsInputStream(fileId, start, end);
 
 	        /*
 	            // ***** writeFile writes data from inputSteam to outStream only when requested by client ******
