@@ -183,7 +183,7 @@ class GDrive {
         if (firstBytePos != null) {
             // **** Range headers are required here
             //this works
-            request.requestHeaders.range = "bytes=$firstBytePos-${lastBytePos ?: 0}"
+            request.requestHeaders.range = "bytes=$firstBytePos-${lastBytePos ?: ""}"
 
             // this does not work
             // request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
