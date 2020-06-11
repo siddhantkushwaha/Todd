@@ -1,11 +1,11 @@
-###Todd is a utility library to interact with Google Drive Files.
+### Todd is a utility library to interact with Google Drive Files.
 
-###Features - 
+### Features - 
  1. Download files functionality with resume capability.
  2. Upload files and even folders without zipping.
  3. Files on drive provided as InputStream to creating streaming services.
 
-###How to install?
+### How to install?
 
 Update your build.gradle file.
 
@@ -15,7 +15,7 @@ Update your build.gradle file.
     
     implementation 'com.github.siddhantkushwaha:todd:version'
 
-###This is how I use it to stream content over http.
+### This is how I use it to stream content over http.
 
 
 
@@ -56,7 +56,7 @@ Update your build.gradle file.
 
 	        /*
 	            // ***** writeFile writes data from inputSteam to outStream only when requested by client ******
-                // ***** also make content format supports streaming with partial content ******
+                // ***** make sure content supports streaming with partial data ******
 	            fun writeFile(ist: InputStream, fos: OutputStream) {
 	                // write in 2MB chunks, this can be changed
 	                val buffer = ByteArray(1024 * 1024 * 2)
@@ -82,4 +82,4 @@ Update your build.gradle file.
 
 [Also available here.](https://gist.github.com/siddhantkushwaha/ba973430d61ffcf5fa7d9d19471d9675)
 
-##Doc coming soon.
+## Doc coming soon.
