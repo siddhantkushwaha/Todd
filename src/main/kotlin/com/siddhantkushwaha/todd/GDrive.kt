@@ -84,8 +84,13 @@ class GDrive {
         request.mediaHttpDownloader.isDirectDownloadEnabled = false
         request.mediaHttpDownloader.chunkSize = CHUNK_SIZE.toInt()
 
-        if (firstBytePos != null && lastBytePos != null)
+        if (firstBytePos != null && lastBytePos != null) {
+            // **** Range headers not necessary for direct downloads *****
+            // request.requestHeaders.range = "bytes=7-9"
+
+            // this works
             request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
+        }
 
         val outputStream = if (filePath == null)
             ByteArrayOutputStream()
@@ -175,8 +180,14 @@ class GDrive {
         request.mediaHttpDownloader.isDirectDownloadEnabled = false
         request.mediaHttpDownloader.chunkSize = CHUNK_SIZE.toInt()
 
-        if (firstBytePos != null && lastBytePos != null)
-            request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
+        if (firstBytePos != null) {
+            // **** Range headers are required here
+            //this works
+            request.requestHeaders.range = "bytes=$firstBytePos-${lastBytePos ?: 0}"
+
+            // this does not work
+            // request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
+        }
 
         return request.executeMediaAsInputStream()
     }
