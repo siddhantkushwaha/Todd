@@ -15,6 +15,26 @@ Update your build.gradle file.
     
     implementation 'com.github.siddhantkushwaha:todd:version'
 
+##### Insert credentials.json into resources directory
+
+should look like this - 
+
+	{
+		"installed": {
+			"client_id": "********.apps.googleusercontent.com",
+			"project_id": "******",
+			"auth_uri": "https://accounts.google.com/o/oauth2/auth",
+			"token_uri": "https://oauth2.googleapis.com/token",
+			"auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+			"client_secret": "*********",
+			"redirect_uris": [
+			"urn:ietf:wg:oauth:2.0:oob",
+			"http://localhost"
+			]
+		}
+	}
+
+
 ### This is how I use it to stream content over http.
 
 
