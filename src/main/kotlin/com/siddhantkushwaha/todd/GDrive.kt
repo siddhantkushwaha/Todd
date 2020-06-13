@@ -64,6 +64,10 @@ class GDrive {
         return AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
     }
 
+    public fun getFile(fileId: String): com.google.api.services.drive.model.File {
+        return service.files().get(fileId).execute()!!
+    }
+
     public fun getSize(fileId: String): Long {
         val file = service.files().get(fileId).setFields("size").execute()!!
         return file.getSize()
