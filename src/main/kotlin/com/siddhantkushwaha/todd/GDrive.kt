@@ -65,17 +65,15 @@ class GDrive {
     }
 
     public fun getFile(fileId: String): com.google.api.services.drive.model.File {
-        return service.files().get(fileId).execute()!!
+        return service.files().get(fileId).setFields("id,name,size,mimeType").execute()!!
     }
 
     public fun getSize(fileId: String): Long {
-        val file = service.files().get(fileId).setFields("size").execute()!!
-        return file.getSize()
+        return getFile(fileId).getSize()
     }
 
     public fun getName(fileId: String): String {
-        val file = service.files().get(fileId).setFields("name").execute()!!
-        return file.name
+        return getFile(fileId).name
     }
 
     public fun download(
