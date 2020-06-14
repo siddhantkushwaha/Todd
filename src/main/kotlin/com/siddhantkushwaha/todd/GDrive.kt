@@ -1,5 +1,17 @@
 package com.siddhantkushwaha.todd
 
+import java.io.*
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.util.*
+import java.util.concurrent.Executors
+
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
+import kotlin.math.min
+import kotlin.math.pow
+
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver
@@ -13,16 +25,6 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
-import java.io.*
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-import java.util.*
-import java.util.concurrent.Executors
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
-import kotlin.math.min
-import kotlin.math.pow
 
 
 class GDrive {
@@ -62,6 +64,10 @@ class GDrive {
             .build()
         val receiver = LocalServerReceiver.Builder().setPort(8888).build()
         return AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
+    }
+
+    public fun getDriveService(): Drive {
+        return service
     }
 
     public fun getFile(fileId: String): com.google.api.services.drive.model.File {
@@ -194,16 +200,6 @@ class GDrive {
         return request.executeMediaAsInputStream()
     }
 
-    private fun createDirectory(name: String, driveFolderParentId: String? = null): String {
-        val fileMetadata = com.google.api.services.drive.model.File()
-        fileMetadata.name = name
-        if (driveFolderParentId != null)
-            fileMetadata.parents = mutableListOf(driveFolderParentId)
-        fileMetadata.mimeType = "application/vnd.google-apps.folder"
-        val file = service.files().create(fileMetadata).setFields("id").execute()
-        return file.id
-    }
-
     private fun uploadDirectory(directoryPath: Path, driveFolderParentId: String? = null) {
 
         val cache = HashMap<String, String>()
@@ -237,6 +233,16 @@ class GDrive {
             println("Uploading file: $filePath")
             uploadFile(filePath = filePath, driveFolderParentId = tempDriveFolderParentId)
         }
+    }
+
+    private fun createDirectory(name: String, driveFolderParentId: String? = null): String {
+        val fileMetadata = com.google.api.services.drive.model.File()
+        fileMetadata.name = name
+        if (driveFolderParentId != null)
+            fileMetadata.parents = mutableListOf(driveFolderParentId)
+        fileMetadata.mimeType = "application/vnd.google-apps.folder"
+        val file = service.files().create(fileMetadata).setFields("id").execute()
+        return file.id
     }
 
     private fun uploadFile(filePath: Path, fileType: String = "", driveFolderParentId: String? = null) {
