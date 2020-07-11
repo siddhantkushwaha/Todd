@@ -285,13 +285,16 @@ class GDrive {
         overwrite: Boolean
     ): String {
         var file = getFileByQuery(
-            "name = '${name}' and mimeType='application/vnd.google-apps.folder' " +
-                    "and '${driveFolderParentId}' in parents"
+            "name='${name}' and mimeType='application/vnd.google-apps.folder' " +
+                    "and '${driveFolderParentId}' in parents and trashed=false"
         )
 
         if (overwrite && file != null) {
+
+            println("Overwriting folder ${name}")
+
             /* Deletes without moving to trash */
-            service.files().delete(file.id)
+            service.files().delete(file.id).execute()
             file = null
         }
 
@@ -316,12 +319,15 @@ class GDrive {
 
         var file = getFileByQuery(
             "name = '${uploadFile.name}' and mimeType!='application/vnd.google-apps.folder' " +
-                    "and '${driveFolderParentId}' in parents"
+                    "and '${driveFolderParentId}' in parents and trashed=false"
         )
 
         if (overwrite && file != null && file.getSize() == uploadFile.length()) {
+
+            println("Overwriting file ${uploadFile.name}")
+
             /* Deletes without moving to trash */
-            service.files().delete(file.id)
+            service.files().delete(file.id).execute()
             file = null
         }
 
