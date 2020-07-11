@@ -24,7 +24,8 @@ class GDriveApp {
                 "upload" -> {
                     gDrive.upload(
                         path = Paths.get(args.getOrNull(1)!!),
-                        driveFolderParentId = args.getOrNull(2)
+                        driveFolderParentId = args.getOrNull(2) ?: "root",
+                        overwrite = args.getOrNull(3) ?: "false"
                     )
                 }
             }

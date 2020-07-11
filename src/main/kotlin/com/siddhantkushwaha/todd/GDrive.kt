@@ -1,17 +1,5 @@
 package com.siddhantkushwaha.todd
 
-import java.io.*
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-import java.util.*
-import java.util.concurrent.Executors
-
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
-import kotlin.math.min
-import kotlin.math.pow
-
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver
@@ -25,6 +13,17 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
+import com.google.api.services.drive.model.FileList
+import java.io.*
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.util.*
+import java.util.concurrent.Executors
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
+import kotlin.math.min
+import kotlin.math.pow
 
 
 class GDrive {
@@ -71,7 +70,41 @@ class GDrive {
     }
 
     public fun getFile(fileId: String): com.google.api.services.drive.model.File {
-        return service.files().get(fileId).setFields("id,name,size,mimeType").execute()!!
+        return service.files().get(fileId).setFields("id, name, size, mimeType").execute()!!
+    }
+
+    public fun getFileByQuery(query: String): com.google.api.services.drive.model.File? {
+        val files = ArrayList<com.google.api.services.drive.model.File>()
+        var pageToken: String? = null
+        do {
+            val result: FileList = service.files().list()
+                .setQ(query)
+                .setSpaces("drive")
+                .setFields("nextPageToken, files(id, name, size, mimeType)")
+                .setPageToken(pageToken)
+                .execute()
+            for (file in result.files)
+                return file
+            pageToken = result.nextPageToken
+        } while (pageToken != null)
+        return null
+    }
+
+    public fun getFilesByQuery(query: String): ArrayList<com.google.api.services.drive.model.File> {
+        val files = ArrayList<com.google.api.services.drive.model.File>()
+        var pageToken: String? = null
+        do {
+            val result: FileList = service.files().list()
+                .setQ(query)
+                .setSpaces("drive")
+                .setFields("nextPageToken, files(id, name, size, mimeType)")
+                .setPageToken(pageToken)
+                .execute()
+            for (file in result.files)
+                files.addAll(result.files)
+            pageToken = result.nextPageToken
+        } while (pageToken != null)
+        return files
     }
 
     public fun getSize(fileId: String): Long {
@@ -192,15 +225,17 @@ class GDrive {
             // **** Range headers are required here
             //this works
             request.requestHeaders.range = "bytes=$firstBytePos-${lastBytePos ?: ""}"
-
-            // this does not work
-            // request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
         }
 
         return request.executeMediaAsInputStream()
     }
 
-    private fun uploadDirectory(directoryPath: Path, driveFolderParentId: String? = null) {
+    private fun uploadDirectory(
+        directoryPath: Path,
+        driveFolderParentId: String = "root",
+        overwrite: Boolean
+    ): String? {
+        val index = HashMap<String, String>()
 
         val cache = HashMap<String, String>()
         Files.walk(directoryPath).filter { it.toFile().isFile }.forEach { filePath: Path ->
@@ -221,60 +256,113 @@ class GDrive {
                 val key = "$name-$tempDriveFolderParentId"
 
                 if (cache.containsKey(key))
-                    tempDriveFolderParentId = cache[key]
+                    tempDriveFolderParentId = cache[key]!!
                 else {
                     println("Creating directory: $parentPath")
-                    tempDriveFolderParentId = createDirectory(name, tempDriveFolderParentId)
+                    tempDriveFolderParentId = createDirectory(name, tempDriveFolderParentId, overwrite)
                     cache[key] = tempDriveFolderParentId
                 }
                 parentPaths.pop()
             }
 
             println("Uploading file: $filePath")
-            uploadFile(filePath = filePath, driveFolderParentId = tempDriveFolderParentId)
+            val fileId = uploadFile(
+                filePath = filePath,
+                driveFolderParentId = tempDriveFolderParentId,
+                overwrite = overwrite
+            )
+
+            index[filePath.toString()] = fileId
+            index[filePath.parent.toString()] = tempDriveFolderParentId
         }
+
+        return index[directoryPath.toString()]
     }
 
-    private fun createDirectory(name: String, driveFolderParentId: String? = null): String {
-        val fileMetadata = com.google.api.services.drive.model.File()
-        fileMetadata.name = name
-        if (driveFolderParentId != null)
+    private fun createDirectory(
+        name: String,
+        driveFolderParentId: String = "root",
+        overwrite: Boolean
+    ): String {
+        var file = getFileByQuery(
+            "name = '${name}' and mimeType='application/vnd.google-apps.folder' " +
+                    "and '${driveFolderParentId}' in parents"
+        )
+
+        if (overwrite && file != null) {
+            /* Deletes without moving to trash */
+            service.files().delete(file.id)
+            file = null
+        }
+
+        if (file == null) {
+            val fileMetadata = com.google.api.services.drive.model.File()
+            fileMetadata.name = name
+            fileMetadata.mimeType = "application/vnd.google-apps.folder"
             fileMetadata.parents = mutableListOf(driveFolderParentId)
-        fileMetadata.mimeType = "application/vnd.google-apps.folder"
-        val file = service.files().create(fileMetadata).setFields("id").execute()
-        return file.id
+            file = service.files().create(fileMetadata).setFields("id").execute()
+        }
+
+        return file!!.id
     }
 
-    private fun uploadFile(filePath: Path, fileType: String = "", driveFolderParentId: String? = null) {
+    private fun uploadFile(
+        filePath: Path,
+        fileType: String = "",
+        driveFolderParentId: String = "root",
+        overwrite: Boolean
+    ): String {
         val uploadFile = filePath.toFile()
 
-        val mediaContent = FileContent(fileType, uploadFile)
-        val fileMetadata = com.google.api.services.drive.model.File()
-        fileMetadata.name = uploadFile.name
+        var file = getFileByQuery(
+            "name = '${uploadFile.name}' and mimeType!='application/vnd.google-apps.folder' " +
+                    "and '${driveFolderParentId}' in parents"
+        )
 
-        if (!driveFolderParentId.isNullOrBlank()) {
+        if (overwrite && file != null && file.getSize() == uploadFile.length()) {
+            /* Deletes without moving to trash */
+            service.files().delete(file.id)
+            file = null
+        }
+
+        if (file == null) {
+            val mediaContent = FileContent(fileType, uploadFile)
+            val fileMetadata = com.google.api.services.drive.model.File()
+            fileMetadata.name = uploadFile.name
+
             val parents = mutableListOf<String>()
             parents.add(driveFolderParentId)
             fileMetadata.parents = parents
+
+
+            val request = service.files().create(fileMetadata, mediaContent)
+            request.mediaHttpUploader.isDirectUploadEnabled = false
+            request.mediaHttpUploader.setProgressListener {
+                println("Upload progress for ${uploadFile.name} - ${it.progress * 100}%")
+            }
+            file = request.execute()
         }
 
-        val request = service.files().create(fileMetadata, mediaContent)
-        request.mediaHttpUploader.isDirectUploadEnabled = false
-        request.mediaHttpUploader.setProgressListener {
-            println("Upload progress for ${uploadFile.name} - ${it.progress * 100}%")
-        }
-        request.execute()
+        return file!!.id
     }
 
-    public fun upload(path: Path, driveFolderParentId: String? = null) {
+    public fun upload(path: Path, driveFolderParentId: String = "root", overwrite: String = "false") {
         val file = path.toFile()
         if (!file.exists())
             println("Path doesn't exist, aborting.")
 
         if (file.isDirectory)
-            uploadDirectory(directoryPath = path.toRealPath(), driveFolderParentId = driveFolderParentId)
+            uploadDirectory(
+                directoryPath = path.toRealPath(),
+                driveFolderParentId = driveFolderParentId,
+                overwrite = overwrite == "true"
+            )
         else if (file.isFile)
-            uploadFile(filePath = path.toRealPath(), driveFolderParentId = driveFolderParentId)
+            uploadFile(
+                filePath = path.toRealPath(),
+                driveFolderParentId = driveFolderParentId,
+                overwrite = overwrite == "true"
+            )
     }
 }
 
