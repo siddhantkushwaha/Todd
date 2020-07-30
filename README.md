@@ -20,11 +20,7 @@ implementation 'com.github.siddhantkushwaha:todd:version'
 
 ### Steps to generate credentials.json
 
-\-  Google Drive
-
-For Google Drive scanning you need to get a Google Drive API credentials file, it's free!
-
-You can use a many steps manual option, or the 6 steps 'Quickstart' workaround.
+You can use a many steps manual option, or the 6 steps **'Quickstart'** workaround.
 
 **Manual/customized:**
 
@@ -97,8 +93,6 @@ This will 'abuse' a 'Quickstart' project.
  
 
 On the first use, you will get a browser screen that you need to grant access for it, and because we haven't granted out OAuth consent screen (This app isn't verified), we get an extra warning. You can use the "Advanced" link, and use the "Go to yourappname (unsafe)" link.
-
- ![](https://i.imgur.com/D3JFAoX.png)
 
 ##### Insert credentials.json into resources directory
 
