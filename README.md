@@ -88,15 +88,13 @@ This will 'abuse' a 'Quickstart' project.
 
 5. Click "DOWNLOAD CLIENT CONFIGURATION"
 
-6. You will get a file like "credentials.json", and put this in root of the repo.
-
- 
+6. You will get a file like "credentials.json", and put this in `src/main/resources` directory.
 
 On the first use, you will get a browser screen that you need to grant access for it, and because we haven't granted out OAuth consent screen (This app isn't verified), we get an extra warning. You can use the "Advanced" link, and use the "Go to yourappname (unsafe)" link.
 
 ##### Insert credentials.json into resources directory
 
-should look like this -
+Should look like this -
 
 ```json
 {
