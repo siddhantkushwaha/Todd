@@ -74,7 +74,6 @@ class GDrive {
     }
 
     public fun getFileByQuery(query: String): com.google.api.services.drive.model.File? {
-        val files = ArrayList<com.google.api.services.drive.model.File>()
         var pageToken: String? = null
         do {
             val result: FileList = service.files().list()
@@ -201,7 +200,7 @@ class GDrive {
         val fileStream = FileOutputStream(filePath)
         chunks.forEach { chunkPath ->
             val inputStream = FileInputStream(chunkPath)
-            fileStream.write(inputStream.readAllBytes())
+            fileStream.write(inputStream.readBytes())
         }
 
         if (File(filePath).length() == fileSize) {
