@@ -198,8 +198,6 @@ class GDrive {
             println("File downloaded, deleting chunks..")
             File(chunkDir).deleteRecursively()
         }
-
-        println("Completed.")
     }
 
     public fun downloadFileAsInputStream(
