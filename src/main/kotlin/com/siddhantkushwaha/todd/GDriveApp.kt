@@ -8,24 +8,25 @@ class GDriveApp {
 
         @JvmStatic
         fun main(args: Array<String>) {
+            val gDrive = GDrive()
+
             if (args.isEmpty())
                 throw Exception("Command not found.")
 
-            val gDrive = GDrive()
             when (args[0]) {
                 "download" -> {
-                    gDrive.downloadLocally(
-                        fileId = args.getOrNull(1)!!,
-                        downloadDir = args.getOrNull(2) ?: "downloads",
-                        numWorkers = Integer.parseInt(args.getOrNull(3) ?: "8")
+                    gDrive.download(
+                            id = args.getOrNull(1)!!,
+                            downloadDir = Paths.get(args.getOrNull(2) ?: "downloads"),
+                            numWorkers = Integer.parseInt(args.getOrNull(3) ?: "8")
                     )
                 }
 
                 "upload" -> {
                     gDrive.upload(
-                        path = Paths.get(args.getOrNull(1)!!),
-                        driveFolderParentId = args.getOrNull(2) ?: "root",
-                        overwrite = args.getOrNull(3) ?: "false"
+                            path = Paths.get(args.getOrNull(1)!!),
+                            driveFolderParentId = args.getOrNull(2) ?: "root",
+                            overwrite = args.getOrNull(3) ?: "false"
                     )
                 }
             }
