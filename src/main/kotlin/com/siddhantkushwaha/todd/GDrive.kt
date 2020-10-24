@@ -72,7 +72,7 @@ class GDrive {
                 .setFields("nextPageToken, files(id, name, size, mimeType)")
     }
 
-    public fun geService(): Drive {
+    public fun getService(): Drive {
         return service
     }
 
@@ -118,7 +118,6 @@ class GDrive {
         val filePath = Paths.get(downloadDir.toString(), driveFile.name)
 
         val file = filePath.toFile()
-        val fileOS = FileOutputStream(file, !overwrite)
 
         val startPos = if (file.exists() && !overwrite) file.length() else 0
         val endPos = driveFileSize - 1
@@ -128,6 +127,7 @@ class GDrive {
             return
         }
 
+        val fileOS = FileOutputStream(file, !overwrite)
         val driveFileIS = downloadFileAsInputStream(fileId, startPos, endPos)
 
         var buffer = ByteArray(2 * 1024 * 10124)
