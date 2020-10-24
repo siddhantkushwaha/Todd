@@ -18,13 +18,13 @@ class GDriveApp {
                     gDrive.download(
                             id = args.getOrNull(1)!!,
                             downloadDir = Paths.get(args.getOrNull(2) ?: "downloads"),
-                            numWorkers = Integer.parseInt(args.getOrNull(3) ?: "8")
+                            overwrite = args.getOrNull(3) ?: "false" == "true"
                     )
                 }
 
                 "upload" -> {
                     gDrive.upload(
-                            path = Paths.get(args.getOrNull(1)!!),
+                            path = Paths.get(args.getOrNull(1) ?: throw Exception("Upload path not provided.")),
                             driveFolderParentId = args.getOrNull(2) ?: "root",
                             overwrite = args.getOrNull(3) ?: "false"
                     )

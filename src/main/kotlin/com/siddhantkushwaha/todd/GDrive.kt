@@ -13,201 +13,94 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
-import com.google.api.services.drive.model.FileList
-import java.io.*
+import com.google.api.services.drive.model.File
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.InputStreamReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
-import java.util.concurrent.Executors
-import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.collections.HashSet
-import kotlin.math.min
 import kotlin.math.pow
 
 
 class GDrive {
 
-    private val APPLICATION_NAME = "GDrive - Todd"
-    private val SCOPES = listOf(DriveScopes.DRIVE)
-    private val JSON_FACTORY: JsonFactory = JacksonFactory.getDefaultInstance()
-    private val CREDENTIALS_FILE_PATH = "/credentials.json"
-    private val TOKENS_DIRECTORY_PATH = "tokens"
+    private val applicationName = "GDrive - Todd"
+    private val scopes = listOf(DriveScopes.DRIVE)
+    private val jsonFactory: JsonFactory = JacksonFactory.getDefaultInstance()
+    private val credentialPath = "/credentials.json"
+    private val tokenDirectoryPath = Paths.get("tokens")
 
-    /* 32 MB */
-    private val CHUNK_SIZE: Long = 32 * 2.0.pow(20).toLong()
+    /* 10 MB */
+    private val chunkSize: Long = 10 * 2.0.pow(20).toLong()
 
     private val service: Drive
 
     init {
-        val HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport()
-        service = Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-                .setApplicationName(APPLICATION_NAME)
+        val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
+        service = Drive.Builder(httpTransport, jsonFactory, getCredentials(httpTransport))
+                .setApplicationName(applicationName)
                 .build()
     }
 
     private fun getCredentials(HTTP_TRANSPORT: NetHttpTransport): Credential {
         // Load client secrets.
 
-        val inputStream = GDrive::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH)
-                ?: throw FileNotFoundException("Resource not found: $CREDENTIALS_FILE_PATH")
+        val inputStream = GDrive::class.java.getResourceAsStream(credentialPath)
+                ?: throw Exception("Resource not found: $credentialPath")
 
-        val clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, InputStreamReader(inputStream))
+        val clientSecrets = GoogleClientSecrets.load(jsonFactory, InputStreamReader(inputStream))
 
         // Build flow and trigger user authorization request.
         val flow = GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES
+                HTTP_TRANSPORT, jsonFactory, clientSecrets, scopes
         )
-                .setDataStoreFactory(FileDataStoreFactory(File(TOKENS_DIRECTORY_PATH)))
+                .setDataStoreFactory(FileDataStoreFactory(tokenDirectoryPath.toFile()))
                 .setAccessType("offline")
                 .build()
         val receiver = LocalServerReceiver.Builder().setPort(8888).build()
         return AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
     }
 
-    public fun getDriveService(): Drive {
+    private fun formQuery(query: String): Drive.Files.List {
+        return service.files().list()
+                .setQ(query)
+                .setSpaces("drive")
+                .setFields("nextPageToken, files(id, name, size, mimeType)")
+    }
+
+    public fun geService(): Drive {
         return service
     }
 
-    public fun getFile(fileId: String): com.google.api.services.drive.model.File {
-        return service.files().get(fileId).setFields("id, name, size, mimeType").execute()!!
+    public fun getFile(fileId: String): File {
+        return service.files().get(fileId).setFields("id, name, size, mimeType").execute()
+                ?: throw Exception("File not found $fileId")
     }
 
-    public fun getFileByQuery(query: String): com.google.api.services.drive.model.File? {
-        var pageToken: String? = null
-        do {
-            val result: FileList = service.files().list()
-                    .setQ(query)
-                    .setSpaces("drive")
-                    .setFields("nextPageToken, files(id, name, size, mimeType)")
-                    .setPageToken(pageToken)
-                    .execute()
-            for (file in result.files)
-                return file
-            pageToken = result.nextPageToken
-        } while (pageToken != null)
-        return null
+    public fun getFileByQuery(query: String): File? {
+        return formQuery(query).execute().files.firstOrNull()
     }
 
-    public fun getFilesByQuery(query: String): HashSet<com.google.api.services.drive.model.File> {
-        val files = HashSet<com.google.api.services.drive.model.File>()
+    public fun getFilesByQuery(query: String): HashSet<File> {
+        val files = HashSet<File>()
         var pageToken: String? = null
         do {
-            val result: FileList = service.files().list()
-                    .setQ(query)
-                    .setSpaces("drive")
-                    .setFields("nextPageToken, files(id, name, size, mimeType, parents)")
-                    .setPageToken(pageToken)
-                    .execute()
+            val result = formQuery(query).setPageToken(pageToken).execute()
             files.addAll(result.files)
             pageToken = result.nextPageToken
         } while (pageToken != null)
         return files
     }
 
-    public fun downloadFile(
-            fileId: String,
-            filePath: Path? = null,
-            firstBytePos: Long? = null,
-            lastBytePos: Long? = null
-    ): ByteArray? {
+    public fun downloadFileAsInputStream(fileId: String, firstBytePos: Long? = null, lastBytePos: Long? = null): InputStream {
+
         val request = service.files().get(fileId)
         request.mediaHttpDownloader.isDirectDownloadEnabled = false
-        request.mediaHttpDownloader.chunkSize = CHUNK_SIZE.toInt()
-
-        if (firstBytePos != null && lastBytePos != null) {
-            // **** Range headers not necessary for direct downloads *****
-            // request.requestHeaders.range = "bytes=7-9"
-
-            // this works
-            request.mediaHttpDownloader.setContentRange(firstBytePos, lastBytePos.toInt())
-        }
-
-        val outputStream = if (filePath == null)
-            ByteArrayOutputStream()
-        else
-            FileOutputStream(filePath.toString())
-
-        request.executeMediaAndDownloadTo(outputStream)
-
-        return if (filePath == null) {
-            (outputStream as ByteArrayOutputStream).toByteArray()
-        } else
-            null
-    }
-
-    public fun downloadFileLocally(fileId: String, downloadDir: Path, numWorkers: Int = 8) {
-        val file = getFile(fileId)
-
-        /* chunk size of 25 MB */
-        val chunkSizeConst: Long = 25 * 2.0.pow(20).toLong()
-
-        val chunkDir = Paths.get(downloadDir.toString(), fileId).toString()
-        Files.createDirectories(Paths.get(chunkDir))
-
-        val tasks = ArrayList<DownloadTask>()
-        val chunks = ArrayList<String>()
-
-        // loop on required chunks and create download tasks
-        var firstBytePos: Long = 0
-        while (firstBytePos < file.getSize()) {
-
-            val lastBytePos: Long = min(firstBytePos + chunkSizeConst - 1, file.getSize() - 1)
-
-            val chunkName = "chunk-$firstBytePos-$lastBytePos"
-            val chunkPath = Paths.get(chunkDir, chunkName)
-
-            val oldChunk = chunkPath.toFile()
-            val chunkSize = if (oldChunk.exists() && oldChunk.isFile)
-                oldChunk.length()
-            else {
-                oldChunk.delete()
-                0
-            }
-            val expectedChunkSize: Long = (lastBytePos - firstBytePos) + 1
-
-            if (chunkSize != expectedChunkSize)
-                tasks.add(
-                        DownloadTask(
-                                this,
-                                fileId,
-                                chunkPath,
-                                firstBytePos,
-                                lastBytePos
-                        )
-                )
-
-            firstBytePos += expectedChunkSize
-            chunks.add(chunkPath.toString())
-        }
-
-        // actual downloading starts here for remaning chunks
-        val executor = Executors.newFixedThreadPool(numWorkers)
-        executor.invokeAll(tasks)
-        executor.shutdown()
-
-        val filePath = Paths.get(downloadDir.toString(), file.name).toString()
-        val fileStream = FileOutputStream(filePath)
-        chunks.forEach { chunkPath ->
-            val inputStream = FileInputStream(chunkPath)
-            fileStream.write(inputStream.readBytes())
-        }
-
-        if (File(filePath).length() == file.getSize()) {
-            println("File downloaded, deleting chunks..")
-            File(chunkDir).deleteRecursively()
-        }
-    }
-
-    public fun downloadFileAsInputStream(
-            fileId: String,
-            firstBytePos: Long? = null,
-            lastBytePos: Long? = null
-    ): InputStream {
-        val request = service.files().get(fileId)
-        request.mediaHttpDownloader.isDirectDownloadEnabled = false
-        request.mediaHttpDownloader.chunkSize = CHUNK_SIZE.toInt()
+        request.mediaHttpDownloader.chunkSize = chunkSize.toInt()
 
         if (firstBytePos != null) {
             // **** Range headers are required here
@@ -218,37 +111,73 @@ class GDrive {
         return request.executeMediaAsInputStream()
     }
 
-    public fun downloadFolder(id: String, downloadDir: Path, numWorkers: Int = 8) {
+    public fun downloadFile(fileId: String, downloadDir: Path, overwrite: Boolean = false) {
+
+        val driveFile = getFile(fileId)
+        val driveFileSize = driveFile.getSize()
+        val filePath = Paths.get(downloadDir.toString(), driveFile.name)
+
+        val file = filePath.toFile()
+        val fileOS = FileOutputStream(file, !overwrite)
+
+        val startPos = if (file.exists() && !overwrite) file.length() else 0
+        val endPos = driveFileSize - 1
+
+        if (startPos > endPos) {
+            println("Skipping, already downloaded. $filePath - $fileId")
+            return
+        }
+
+        val driveFileIS = downloadFileAsInputStream(fileId, startPos, endPos)
+
+        var buffer = ByteArray(2 * 1024 * 10124)
+        var bufferLen: Int
+
+        var downloadedBytes = startPos
+        do {
+            bufferLen = driveFileIS.read(buffer)
+            if (bufferLen > 0) fileOS.write(buffer, 0, bufferLen)
+            downloadedBytes += bufferLen
+
+            println("Download progress for $filePath - $fileId: ${100 * (downloadedBytes / driveFileSize.toFloat())}%")
+
+        } while (bufferLen > 0)
+
+        fileOS.close()
+        driveFileIS.close()
+    }
+
+    public fun downloadFolder(id: String, downloadDir: Path, overwrite: Boolean = false) {
         val folder = getFile(id)
         if (folder.mimeType != "application/vnd.google-apps.folder") {
             return
         }
 
         val currentDirPath = Paths.get(downloadDir.toString(), folder.name)
+        if (overwrite) {
+            currentDirPath.toFile().deleteRecursively()
+        }
         Files.createDirectories(currentDirPath)
 
         for (file in getFilesByQuery("'${id}' in parents and trashed=false")) {
             if (file.mimeType == "application/vnd.google-apps.folder")
-                downloadFolder(file.id, currentDirPath, numWorkers)
+                downloadFolder(file.id, currentDirPath)
             else
-                downloadFileLocally(file.id, currentDirPath, numWorkers)
+                downloadFile(file.id, currentDirPath)
         }
     }
 
-    public fun download(id: String, downloadDir: Path, numWorkers: Int = 8) {
+    public fun download(id: String, downloadDir: Path, overwrite: Boolean = false) {
         Files.createDirectories(downloadDir.toAbsolutePath())
         val file = getFile(id)
         if (file.mimeType == "application/vnd.google-apps.folder")
-            downloadFolder(id, downloadDir.toAbsolutePath(), numWorkers)
+            downloadFolder(id, downloadDir.toAbsolutePath(), overwrite)
         else
-            downloadFileLocally(id, downloadDir.toAbsolutePath(), numWorkers)
+            downloadFile(id, downloadDir.toAbsolutePath(), overwrite)
     }
 
-    public fun uploadDirectory(
-            directoryPath: Path,
-            driveFolderParentId: String = "root",
-            overwrite: Boolean
-    ): String? {
+    public fun uploadDirectory(directoryPath: Path, driveFolderParentId: String = "root", overwrite: Boolean): String? {
+
         val index = HashMap<String, String>()
 
         val cache = HashMap<String, String>()
@@ -293,11 +222,8 @@ class GDrive {
         return index[directoryPath.toString()]
     }
 
-    public fun createDirectory(
-            name: String,
-            driveFolderParentId: String = "root",
-            overwrite: Boolean
-    ): String {
+    public fun createDirectory(name: String, driveFolderParentId: String = "root", overwrite: Boolean): String {
+
         var file = getFileByQuery(
                 "name='${name}' and mimeType='application/vnd.google-apps.folder' " +
                         "and '${driveFolderParentId}' in parents and trashed=false"
@@ -313,7 +239,7 @@ class GDrive {
         }
 
         if (file == null) {
-            val fileMetadata = com.google.api.services.drive.model.File()
+            val fileMetadata = File()
             fileMetadata.name = name
             fileMetadata.mimeType = "application/vnd.google-apps.folder"
             fileMetadata.parents = mutableListOf(driveFolderParentId)
@@ -323,12 +249,8 @@ class GDrive {
         return file!!.id
     }
 
-    public fun uploadFile(
-            filePath: Path,
-            fileType: String = "",
-            driveFolderParentId: String = "root",
-            overwrite: Boolean
-    ): String {
+    public fun uploadFile(filePath: Path, fileType: String = "", driveFolderParentId: String = "root", overwrite: Boolean): String {
+
         val uploadFile = filePath.toFile()
 
         var file = getFileByQuery(
@@ -347,7 +269,7 @@ class GDrive {
 
         if (file == null) {
             val mediaContent = FileContent(fileType, uploadFile)
-            val fileMetadata = com.google.api.services.drive.model.File()
+            val fileMetadata = File()
             fileMetadata.name = uploadFile.name
 
             val parents = mutableListOf<String>()
