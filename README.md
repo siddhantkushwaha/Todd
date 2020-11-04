@@ -4,7 +4,7 @@
 
 1.  Download files functionality with resume capability.
 2.  Upload files and even folders without zipping.
-3.  Files on drive provided as InputStream to creating streaming services.
+3.  Files on drive provided as InputStream for creating streaming services.
 
 ### How to install?
 
