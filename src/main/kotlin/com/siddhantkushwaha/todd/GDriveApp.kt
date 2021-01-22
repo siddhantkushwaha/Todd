@@ -26,7 +26,7 @@ class GDriveApp {
                     gDrive.upload(
                             path = Paths.get(args.getOrNull(1) ?: throw Exception("Upload path not provided.")),
                             driveFolderParentId = args.getOrNull(2) ?: "root",
-                            overwrite = args.getOrNull(3) ?: "false"
+                            overwrite = args.getOrNull(3) ?: "false" == "true"
                     )
                 }
             }

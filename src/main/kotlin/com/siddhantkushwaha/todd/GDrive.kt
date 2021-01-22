@@ -111,7 +111,7 @@ class GDrive {
         return request.executeMediaAsInputStream()
     }
 
-    public fun downloadFile(fileId: String, downloadDir: Path, overwrite: Boolean = false) {
+    public fun downloadFile(fileId: String, downloadDir: Path, overwrite: Boolean = false): Int {
 
         val driveFile = getFile(fileId)
         val driveFileSize = driveFile.getSize()
@@ -124,13 +124,13 @@ class GDrive {
 
         if (startPos > endPos) {
             println("Skipping, already downloaded. $filePath - $fileId")
-            return
+            return 0
         }
 
         val fileOS = FileOutputStream(file, !overwrite)
         val driveFileIS = downloadFileAsInputStream(fileId, startPos, endPos)
 
-        var buffer = ByteArray(2 * 1024 * 10124)
+        val buffer = ByteArray(2 * 1024 * 10124)
         var bufferLen: Int
 
         var downloadedBytes = startPos
@@ -145,12 +145,14 @@ class GDrive {
 
         fileOS.close()
         driveFileIS.close()
+
+        return 0
     }
 
-    public fun downloadFolder(id: String, downloadDir: Path, overwrite: Boolean = false) {
+    public fun downloadFolder(id: String, downloadDir: Path, overwrite: Boolean = false): Int {
         val folder = getFile(id)
         if (folder.mimeType != "application/vnd.google-apps.folder") {
-            return
+            return 1
         }
 
         val currentDirPath = Paths.get(downloadDir.toString(), folder.name)
@@ -159,21 +161,35 @@ class GDrive {
         }
         Files.createDirectories(currentDirPath)
 
+        var retCode = 0
         for (file in getFilesByQuery("'${id}' in parents and trashed=false")) {
-            if (file.mimeType == "application/vnd.google-apps.folder")
+            retCode = if (file.mimeType == "application/vnd.google-apps.folder")
                 downloadFolder(file.id, currentDirPath)
             else
                 downloadFile(file.id, currentDirPath)
+
+            if (retCode != 0)
+                break
         }
+
+        return retCode
     }
 
     public fun download(id: String, downloadDir: Path, overwrite: Boolean = false) {
         Files.createDirectories(downloadDir.toAbsolutePath())
         val file = getFile(id)
-        if (file.mimeType == "application/vnd.google-apps.folder")
+
+        val retCode = if (file.mimeType == "application/vnd.google-apps.folder")
             downloadFolder(id, downloadDir.toAbsolutePath(), overwrite)
         else
             downloadFile(id, downloadDir.toAbsolutePath(), overwrite)
+
+        val out =
+                if (retCode == 0)
+                    "Download successful."
+                else
+                    "Download failed."
+        println(out)
     }
 
     public fun uploadDirectory(directoryPath: Path, driveFolderParentId: String = "root", overwrite: Boolean): String? {
@@ -203,6 +219,7 @@ class GDrive {
                 else {
                     println("Creating directory: $parentPath")
                     tempDriveFolderParentId = createDirectory(name, tempDriveFolderParentId, overwrite)
+                            ?: throw Exception("Folder creation failed.")
                     cache[key] = tempDriveFolderParentId
                 }
                 parentPaths.pop()
@@ -213,7 +230,7 @@ class GDrive {
                     filePath = filePath,
                     driveFolderParentId = tempDriveFolderParentId,
                     overwrite = overwrite
-            )
+            ) ?: throw Exception("File upload failed.")
 
             index[filePath.toString()] = fileId
             index[filePath.parent.toString()] = tempDriveFolderParentId
@@ -222,7 +239,7 @@ class GDrive {
         return index[directoryPath.toString()]
     }
 
-    public fun createDirectory(name: String, driveFolderParentId: String = "root", overwrite: Boolean): String {
+    public fun createDirectory(name: String, driveFolderParentId: String = "root", overwrite: Boolean): String? {
 
         var file = getFileByQuery(
                 "name='${name}' and mimeType='application/vnd.google-apps.folder' " +
@@ -246,10 +263,10 @@ class GDrive {
             file = service.files().create(fileMetadata).setFields("id").execute()
         }
 
-        return file!!.id
+        return file?.id
     }
 
-    public fun uploadFile(filePath: Path, fileType: String = "", driveFolderParentId: String = "root", overwrite: Boolean): String {
+    public fun uploadFile(filePath: Path, fileType: String = "", driveFolderParentId: String = "root", overwrite: Boolean): String? {
 
         val uploadFile = filePath.toFile()
 
@@ -285,26 +302,28 @@ class GDrive {
             file = request.execute()
         }
 
-        return file!!.id
+        return file?.id
     }
 
-    public fun upload(path: Path, driveFolderParentId: String = "root", overwrite: String = "false") {
+    public fun upload(path: Path, driveFolderParentId: String = "root", overwrite: Boolean = false) {
         val file = path.toFile()
         if (!file.exists())
             println("Path doesn't exist, aborting.")
 
-        if (file.isDirectory)
-            uploadDirectory(
-                    directoryPath = path.toAbsolutePath(),
-                    driveFolderParentId = driveFolderParentId,
-                    overwrite = overwrite == "true"
-            )
-        else if (file.isFile)
-            uploadFile(
-                    filePath = path.toAbsolutePath(),
-                    driveFolderParentId = driveFolderParentId,
-                    overwrite = overwrite == "true"
-            )
+        val out =
+                if (file.isDirectory)
+                    uploadDirectory(
+                            directoryPath = path.toAbsolutePath(),
+                            driveFolderParentId = driveFolderParentId,
+                            overwrite = overwrite
+                    )
+                else
+                    uploadFile(
+                            filePath = path.toAbsolutePath(),
+                            driveFolderParentId = driveFolderParentId,
+                            overwrite = overwrite
+                    )
+        println("Uploaded: $out")
     }
 }
 
