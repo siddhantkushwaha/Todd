@@ -42,34 +42,34 @@ class GDrive {
     init {
         val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
         service = Drive.Builder(httpTransport, jsonFactory, getCredentials(httpTransport))
-                .setApplicationName(applicationName)
-                .build()
+            .setApplicationName(applicationName)
+            .build()
     }
 
     private fun getCredentials(HTTP_TRANSPORT: NetHttpTransport): Credential {
         // Load client secrets.
 
         val inputStream = GDrive::class.java.getResourceAsStream(credentialPath)
-                ?: throw Exception("Resource not found: $credentialPath")
+            ?: throw Exception("Resource not found: $credentialPath")
 
         val clientSecrets = GoogleClientSecrets.load(jsonFactory, InputStreamReader(inputStream))
 
         // Build flow and trigger user authorization request.
         val flow = GoogleAuthorizationCodeFlow.Builder(
-                HTTP_TRANSPORT, jsonFactory, clientSecrets, scopes
+            HTTP_TRANSPORT, jsonFactory, clientSecrets, scopes
         )
-                .setDataStoreFactory(FileDataStoreFactory(tokenDirectoryPath.toFile()))
-                .setAccessType("offline")
-                .build()
+            .setDataStoreFactory(FileDataStoreFactory(tokenDirectoryPath.toFile()))
+            .setAccessType("offline")
+            .build()
         val receiver = LocalServerReceiver.Builder().setPort(8888).build()
         return AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
     }
 
     private fun formQuery(query: String): Drive.Files.List {
         return service.files().list()
-                .setQ(query)
-                .setSpaces("drive")
-                .setFields("nextPageToken, files(id, name, size, mimeType)")
+            .setQ(query)
+            .setSpaces("drive")
+            .setFields("nextPageToken, files(id, name, size, mimeType)")
     }
 
     public fun getService(): Drive {
@@ -78,7 +78,7 @@ class GDrive {
 
     public fun getFile(fileId: String): File {
         return service.files().get(fileId).setFields("id, name, size, mimeType").execute()
-                ?: throw Exception("File not found $fileId")
+            ?: throw Exception("File not found $fileId")
     }
 
     public fun getFileByQuery(query: String): File? {
@@ -96,7 +96,11 @@ class GDrive {
         return files
     }
 
-    public fun downloadFileAsInputStream(fileId: String, firstBytePos: Long? = null, lastBytePos: Long? = null): InputStream {
+    public fun downloadFileAsInputStream(
+        fileId: String,
+        firstBytePos: Long? = null,
+        lastBytePos: Long? = null
+    ): InputStream {
 
         val request = service.files().get(fileId)
         request.mediaHttpDownloader.isDirectDownloadEnabled = false
@@ -118,8 +122,9 @@ class GDrive {
         val filePath = Paths.get(downloadDir.toString(), driveFile.name)
 
         val file = filePath.toFile()
+        val diskFileSize = file.length()
 
-        val startPos = if (file.exists() && !overwrite) file.length() else 0
+        val startPos = if (file.exists() && !overwrite) diskFileSize else 0
         val endPos = driveFileSize - 1
 
         if (startPos > endPos) {
@@ -185,10 +190,10 @@ class GDrive {
             downloadFile(id, downloadDir.toAbsolutePath(), overwrite)
 
         val out =
-                if (retCode == 0)
-                    "Download successful."
-                else
-                    "Download failed."
+            if (retCode == 0)
+                "Download successful."
+            else
+                "Download failed."
         println(out)
     }
 
@@ -219,7 +224,7 @@ class GDrive {
                 else {
                     println("Creating directory: $parentPath")
                     tempDriveFolderParentId = createDirectory(name, tempDriveFolderParentId, overwrite)
-                            ?: throw Exception("Folder creation failed.")
+                        ?: throw Exception("Folder creation failed.")
                     cache[key] = tempDriveFolderParentId
                 }
                 parentPaths.pop()
@@ -227,9 +232,9 @@ class GDrive {
 
             println("Uploading file: $filePath")
             val fileId = uploadFile(
-                    filePath = filePath,
-                    driveFolderParentId = tempDriveFolderParentId,
-                    overwrite = overwrite
+                filePath = filePath,
+                driveFolderParentId = tempDriveFolderParentId,
+                overwrite = overwrite
             ) ?: throw Exception("File upload failed.")
 
             index[filePath.toString()] = fileId
@@ -242,13 +247,13 @@ class GDrive {
     public fun createDirectory(name: String, driveFolderParentId: String = "root", overwrite: Boolean): String? {
 
         var file = getFileByQuery(
-                "name='${name}' and mimeType='application/vnd.google-apps.folder' " +
-                        "and '${driveFolderParentId}' in parents and trashed=false"
+            "name='${name}' and mimeType='application/vnd.google-apps.folder' " +
+                    "and '${driveFolderParentId}' in parents and trashed=false"
         )
 
         if (overwrite && file != null) {
 
-            println("Overwriting folder ${name}")
+            println("Overwriting folder $name")
 
             /* Deletes without moving to trash */
             service.files().delete(file.id).execute()
@@ -266,16 +271,21 @@ class GDrive {
         return file?.id
     }
 
-    public fun uploadFile(filePath: Path, fileType: String = "", driveFolderParentId: String = "root", overwrite: Boolean): String? {
+    public fun uploadFile(
+        filePath: Path,
+        fileType: String = "",
+        driveFolderParentId: String = "root",
+        overwrite: Boolean
+    ): String? {
 
         val uploadFile = filePath.toFile()
 
         var file = getFileByQuery(
-                "name = '${uploadFile.name}' and mimeType!='application/vnd.google-apps.folder' " +
-                        "and '${driveFolderParentId}' in parents and trashed=false"
+            "name = '${uploadFile.name}' and mimeType!='application/vnd.google-apps.folder' " +
+                    "and '${driveFolderParentId}' in parents and trashed=false"
         )
 
-        if (overwrite && file != null && file.getSize() == uploadFile.length()) {
+        if (overwrite && file != null) {
 
             println("Overwriting file ${uploadFile.name}")
 
@@ -311,18 +321,18 @@ class GDrive {
             println("Path doesn't exist, aborting.")
 
         val out =
-                if (file.isDirectory)
-                    uploadDirectory(
-                            directoryPath = path.toAbsolutePath(),
-                            driveFolderParentId = driveFolderParentId,
-                            overwrite = overwrite
-                    )
-                else
-                    uploadFile(
-                            filePath = path.toAbsolutePath(),
-                            driveFolderParentId = driveFolderParentId,
-                            overwrite = overwrite
-                    )
+            if (file.isDirectory)
+                uploadDirectory(
+                    directoryPath = path.toAbsolutePath(),
+                    driveFolderParentId = driveFolderParentId,
+                    overwrite = overwrite
+                )
+            else
+                uploadFile(
+                    filePath = path.toAbsolutePath(),
+                    driveFolderParentId = driveFolderParentId,
+                    overwrite = overwrite
+                )
         println("Uploaded: $out")
     }
 }
