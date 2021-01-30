@@ -285,13 +285,19 @@ class GDrive {
                     "and '${driveFolderParentId}' in parents and trashed=false"
         )
 
-        if (overwrite && file != null) {
+        // case when file already exists
+        if (file != null) {
 
-            println("Overwriting file ${uploadFile.name}")
+            println("Overwrite: $overwrite")
+            println("Old file size: ${file.getSize()}, new file size: ${uploadFile.length()}")
 
-            /* Deletes without moving to trash */
-            service.files().delete(file.id).execute()
-            file = null
+            if (
+                overwrite // If overwrite argument is true
+                || file.getSize() != uploadFile.length() // If file was not uploaded fully
+            ) {
+                service.files().delete(file.id).execute() // Deletes without moving to trash
+                file = null
+            }
         }
 
         if (file == null) {
