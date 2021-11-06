@@ -1,38 +1,27 @@
 package com.siddhantkushwaha.todd
 
-import com.google.api.client.auth.oauth2.Credential
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
 import com.google.api.client.http.FileContent
-import com.google.api.client.http.javanet.NetHttpTransport
-import com.google.api.client.json.JsonFactory
 import com.google.api.client.json.jackson2.JacksonFactory
-import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.io.InputStreamReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.*
-import kotlin.collections.HashMap
-import kotlin.collections.HashSet
 import kotlin.math.pow
 
 
 class GDrive {
 
     private val applicationName = "GDrive - Todd"
-    private val scopes = listOf(DriveScopes.DRIVE)
-    private val jsonFactory: JsonFactory = JacksonFactory.getDefaultInstance()
-    private val credentialPath = "/credentials.json"
-    private val tokenDirectoryPath = Paths.get("tokens")
+    private val scopes = listOf(
+        DriveScopes.DRIVE
+    )
+    private val tokenDirectoryPath = Paths.get("tokens/gdrive")
 
     /* 10 MB */
     private val chunkSize: Long = 10 * 2.0.pow(20).toLong()
@@ -41,28 +30,13 @@ class GDrive {
 
     init {
         val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
-        service = Drive.Builder(httpTransport, jsonFactory, getCredentials(httpTransport))
+        service = Drive.Builder(
+            httpTransport,
+            JacksonFactory.getDefaultInstance(),
+            Common.getCredential(httpTransport, JacksonFactory.getDefaultInstance(), scopes, tokenDirectoryPath)
+        )
             .setApplicationName(applicationName)
             .build()
-    }
-
-    private fun getCredentials(HTTP_TRANSPORT: NetHttpTransport): Credential {
-        // Load client secrets.
-
-        val inputStream = GDrive::class.java.getResourceAsStream(credentialPath)
-            ?: throw Exception("Resource not found: $credentialPath")
-
-        val clientSecrets = GoogleClientSecrets.load(jsonFactory, InputStreamReader(inputStream))
-
-        // Build flow and trigger user authorization request.
-        val flow = GoogleAuthorizationCodeFlow.Builder(
-            HTTP_TRANSPORT, jsonFactory, clientSecrets, scopes
-        )
-            .setDataStoreFactory(FileDataStoreFactory(tokenDirectoryPath.toFile()))
-            .setAccessType("offline")
-            .build()
-        val receiver = LocalServerReceiver.Builder().setPort(8888).build()
-        return AuthorizationCodeInstalledApp(flow, receiver).authorize("user")
     }
 
     private fun formQuery(query: String): Drive.Files.List {

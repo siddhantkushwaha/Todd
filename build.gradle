@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.siddhantkushwaha'
-version '1.0'
+version '1.1'
 
 task fatJar(type: Jar) {
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
@@ -24,7 +24,12 @@ dependencies {
 
     implementation "com.google.api-client:google-api-client:1.23.0"
     implementation "com.google.oauth-client:google-oauth-client-jetty:1.23.0"
+
     implementation "com.google.apis:google-api-services-drive:v3-rev110-1.23.0"
+
+    implementation "com.google.photos.library:google-photos-library-client:1.7.1"
+
+    implementation "com.google.guava:guava:31.0.1-jre"
 }
 
 compileKotlin {
