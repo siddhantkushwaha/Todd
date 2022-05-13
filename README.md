@@ -26,7 +26,7 @@ You can use a many steps manual option, or the 6 steps **'Quickstart'** workarou
 
 1. Go to https://console.cloud.google.com/projectcreate
 
-2. Fill in Project Name, like "todd-Testing" or so, lease Location unchanged
+2. Fill in Project Name, like "todd-Testing" or so, leave Location unchanged
 
 3. Change Project ID (optional)
 
